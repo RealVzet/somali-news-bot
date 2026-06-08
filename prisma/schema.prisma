@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Article {
+  id               String   @id @default(cuid())
+  url              String   @unique
+  source           String
+  originalTitle    String
+  somaliTitle      String?
+  originalContent  String?
+  somaliSummary    String?
+  imageUrl         String?
+  author           String?
+  category         String?
+  hashtags         String[]
+  publishedAt      DateTime?
+  processedAt      DateTime?
+  telegramMessageId String?
+  status           ArticleStatus @default(PENDING)
+  errorMessage     String?
+  retryCount       Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([status])
+  @@index([source])
+  @@index([createdAt])
+}
+
+model BotState {
+  id        String   @id @default("singleton")
+  isPaused  Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+}
+
+model SourceHealth {
+  id           String   @id @default(cuid())
+  sourceName   String   @unique
+  lastSuccess  DateTime?
+  lastFailure  DateTime?
+  failureCount Int      @default(0)
+  isDisabled   Boolean  @default(false)
+  updatedAt    DateTime @updatedAt
+}
+
+enum ArticleStatus {
+  PENDING
+  PROCESSING
+  PUBLISHED
+  FAILED
+  SKIPPED
+}
