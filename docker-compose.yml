@@ -1,0 +1,43 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: newsbot_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: newsbot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: newsbot
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U newsbot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  bot:
+    build: .
+    container_name: newsbot_app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://newsbot:${POSTGRES_PASSWORD:-changeme}@postgres:5432/newsbot
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHANNEL_ID: ${TELEGRAM_CHANNEL_ID}
+      TELEGRAM_ADMIN_IDS: ${TELEGRAM_ADMIN_IDS}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      NEWS_CHECK_INTERVAL_SECONDS: ${NEWS_CHECK_INTERVAL_SECONDS:-45}
+      MAX_ARTICLES_PER_RUN: ${MAX_ARTICLES_PER_RUN:-10}
+      MAX_RETRY_COUNT: ${MAX_RETRY_COUNT:-3}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      NODE_ENV: production
+    volumes:
+      - ./logs:/app/logs
+
+volumes:
+  postgres_data:
