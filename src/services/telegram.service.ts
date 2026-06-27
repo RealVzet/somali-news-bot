@@ -1,7 +1,7 @@
 import { Telegraf } from "telegraf";
 import { config } from "../config";
 import { logger } from "../utils/logger";
-import { escapeMarkdown, truncate } from "../utils/helpers";
+import { truncate } from "../utils/helpers";
 import type { ProcessedArticle } from "../types";
 
 let bot: Telegraf;
@@ -11,23 +11,36 @@ export function getBot(): Telegraf {
   return bot;
 }
 
+/**
+ * Escape special HTML characters for Telegram HTML parse mode.
+ */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 export async function publishArticle(article: ProcessedArticle): Promise<string> {
   const tg = getBot();
   const hashtags = article.hashtags.join(" ");
 
+  // Source name is the clickable link — no raw URL shown in the post
+  const sourceLink = `<a href="${article.url}">${escapeHtml(article.source)}</a>`;
+
   const caption = [
-    `🚀 *Wararka Teknolojiyada*`,
+    `🚀 <b>Wararka Teknolojiyada</b>`,
     ``,
-    `📰 *Cinwaanka:*`,
-    escapeMarkdown(truncate(article.somaliTitle, 180)),
+    `📰 <b>Cinwaanka:</b>`,
+    escapeHtml(truncate(article.somaliTitle, 180)),
     ``,
-    `📝 *Koobaad:*`,
-    escapeMarkdown(truncate(article.somaliSummary, 700)),
+    `📝 <b>Koobaad:</b>`,
+    escapeHtml(truncate(article.somaliSummary, 700)),
     ``,
-    `🌐 *Isha:* ${escapeMarkdown(article.source)}`,
-    `🔗 [Akhri Wax Dheeraad ah](${article.url})`,
+    `🌐 <b>Isha:</b> ${sourceLink}`,
     ``,
-    escapeMarkdown(hashtags),
+    escapeHtml(hashtags),
   ].join("\n");
 
   let messageId: number;
@@ -36,22 +49,22 @@ export async function publishArticle(article: ProcessedArticle): Promise<string>
     try {
       const msg = await tg.telegram.sendPhoto(config.telegram.channelId, article.imageUrl, {
         caption,
-        parse_mode: "MarkdownV2",
+        parse_mode: "HTML",
       });
       messageId = msg.message_id;
     } catch {
       // Image failed — fall back to text-only
       logger.warn(`Image send failed for: ${article.url}, falling back to text`);
       const msg = await tg.telegram.sendMessage(config.telegram.channelId, caption, {
-        parse_mode: "MarkdownV2",
-        disable_web_page_preview: false,
+        parse_mode: "HTML",
+        disable_web_page_preview: true,
       });
       messageId = msg.message_id;
     }
   } else {
     const msg = await tg.telegram.sendMessage(config.telegram.channelId, caption, {
-      parse_mode: "MarkdownV2",
-      disable_web_page_preview: false,
+      parse_mode: "HTML",
+      disable_web_page_preview: true,
     });
     messageId = msg.message_id;
   }
@@ -70,10 +83,10 @@ export async function publishDailyDigest(intro: string, articles: Array<{ somali
   const lines = [
     `📅 <b>Wararka Maanta — Teknolojiyada</b>`,
     ``,
-    intro,
+    escapeHtml(intro),
     ``,
     ...articles.slice(0, 10).map((a, i) =>
-      `${i + 1}. <a href="${a.url}">${a.somaliTitle}</a> <i>(${a.source})</i>`
+      `${i + 1}. <a href="${a.url}">${escapeHtml(a.somaliTitle)}</a> <i>(${escapeHtml(a.source)})</i>`
     ),
     ``,
     `#WararkaMaanta #Teknolojiyada #AI`,

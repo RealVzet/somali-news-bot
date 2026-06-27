@@ -15,7 +15,7 @@ export async function translateAndSummarize(
   content: string,
   source: string
 ): Promise<TranslationResult> {
-  const prompt = `You are an expert Somali translator and news summarizer.
+  const prompt = `You are a professional Somali journalist writing for everyday Somali readers — people of all ages and education levels across Somalia and the diaspora.
 
 Article Source: ${source}
 Article Title: ${title}
@@ -24,16 +24,25 @@ Article Content:
 ${content.slice(0, 3000)}
 
 Your task:
-1. Translate the title into fluent, natural Somali.
-2. Write a clear, engaging Somali summary (3-5 sentences) of the main points.
-3. Keep all proper names (people, companies, products) in their original form.
-4. Keep technical terms in English when there is no good Somali equivalent.
-5. Write in a professional news style that Somali readers will understand.
+1. Translate the title into simple, clear, everyday Somali that anyone can understand.
+2. Write a Somali news summary (3-5 sentences) covering the main points of the article.
+3. Use simple, common Somali words that ordinary people use in daily conversation — avoid old-fashioned, overly formal, or scholarly Somali.
+4. Write in a friendly, clear news style — like a trusted Somali radio presenter or journalist.
+5. Keep proper names (people, companies, products, places) in their original English spelling.
+6. Keep technical terms in English when there is no simple Somali word for them (e.g. "AI", "robot", "software", "app"). You may add a short Somali explanation in brackets if helpful.
+7. Do NOT use HTML entities like &#8216; or &amp; — write everything as plain readable text.
+8. Do NOT translate word-for-word from English — write naturally as a Somali speaker would say it.
+
+IMPORTANT LANGUAGE RULES:
+- Use SHORT, simple sentences. If a sentence is getting long, split it into two.
+- Prefer common Somali words over rare or borrowed words.
+- A 10-year-old Somali child and a 60-year-old Somali elder should both understand what you wrote.
+- Read your output aloud in your mind — if it sounds unnatural, rewrite it.
 
 Respond ONLY with valid JSON in this exact format:
 {
-  "somaliTitle": "translated title here",
-  "somaliSummary": "somali summary here"
+  "somaliTitle": "simple clear somali title here",
+  "somaliSummary": "simple clear somali summary here"
 }`;
 
   return withRetry(async () => {
@@ -59,8 +68,27 @@ Respond ONLY with valid JSON in this exact format:
       throw new Error("OpenAI response missing required fields");
     }
 
+    // Strip any HTML entities that slipped through
+    parsed.somaliTitle = decodeHtmlEntities(parsed.somaliTitle);
+    parsed.somaliSummary = decodeHtmlEntities(parsed.somaliSummary);
+
     return parsed;
   }, 3, 3000);
+}
+
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&#8216;/g, "'")
+    .replace(/&#8217;/g, "'")
+    .replace(/&#8220;/g, '"')
+    .replace(/&#8221;/g, '"')
+    .replace(/&#8212;/g, '—')
+    .replace(/&#8211;/g, '–')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)));
 }
 
 export async function generateDailyDigest(articles: Array<{ somaliTitle: string; source: string }>): Promise<string> {
@@ -70,7 +98,7 @@ export async function generateDailyDigest(articles: Array<{ somaliTitle: string;
     model: config.openai.model,
     messages: [{
       role: "user",
-      content: `Write a short, engaging Somali introduction (2-3 sentences) for today's technology news digest. Then list these articles:\n\n${list}\n\nRespond in Somali language only.`,
+      content: `Ku qor Af-Soomaali fudud oo cad hordhac gaaban (2-3 jumlood) oo loogu talagalay wararka teknolojiyada maanta. Ka dib, ku taxo wararkaan:\n\n${list}\n\nIsticmaal Af-Soomaali fudud oo qof walba fahmi karo. Ha isticmaalin ereyada adag.`,
     }],
     temperature: 0.5,
     max_tokens: 500,
